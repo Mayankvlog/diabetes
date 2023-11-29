@@ -1,1 +1,2 @@
-# diabetes
+# diabete
+streamlit run app.py
