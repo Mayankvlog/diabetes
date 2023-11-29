@@ -13,6 +13,11 @@ diabetes = load_diabetes()
 X = diabetes.data
 y = diabetes.target
 
+
+# Add logo to the top right corner
+logo_path = "diabetes.jpg"
+st.image(logo_path, width=150)
+
 # Sidebar for user input parameters
 st.sidebar.header('User Input Parameters')
 
