@@ -55,16 +55,12 @@ elif page == "Visualization":
     df_diabetes = pd.DataFrame(data=X_diabetes, columns=[f'feature_{i}' for i in range(X_diabetes.shape[1])])
     df_diabetes['target'] = y_diabetes
 
-    
+
     # Histogram
     st.subheader("Histogram:")
     histogram_fig = px.histogram(df_diabetes, x='target', color='target', marginal='rug')
     st.plotly_chart(histogram_fig)
 
-    # Boxplot
-    st.subheader("Box Plot:")
-    boxplot_fig = px.box(df_diabetes, y='target', points='all', title='Target Boxplot')
-    st.plotly_chart(boxplot_fig)
 
     # Bar plot
     st.subheader("Bar Plot:")
@@ -74,42 +70,55 @@ elif page == "Visualization":
 # Modeling Page
 elif page == "Modeling":
     st.title("Modeling Page")
-    st.write("Train a RandomForestRegressor on the Diabetes dataset.")
+    st.write("Train models on the Diabetes dataset.")
 
     # Sidebar - User input features
-    st.sidebar.header('User Input Parameters')
+    st.sidebar.header('User Input Features')
 
     # Model training
-    st.subheader("Train Model:")
-    with st.form("train_model_form_diabetes"):
-        split_ratio_diabetes = st.slider("Train/Test Split Ratio", 0.1, 0.9, 0.8, 0.05)
-        submit_button_diabetes = st.form_submit_button(label="Train Model")
+    st.subheader("Train Models:")
 
-    if submit_button_diabetes:
-        # Split the data
-        X_train_diabetes, X_test_diabetes, y_train_diabetes, y_test_diabetes = train_test_split(
-            X_diabetes, y_diabetes, test_size=split_ratio_diabetes, random_state=42
-        )
+    models = {
+        "Random Forest": (RandomForestRegressor(), "rf"),
+        "K-Nearest Neighbors (KNN)": (KNeighborsRegressor(), "knn"),
+        "Logistic Regression": (LogisticRegression(), "logreg"),
+        "Support Vector Machine (SVM)": (SVR(), "svm"),
+        "Pipeline (StandardScaler + RandomForestRegressor)": (
+            Pipeline([('scaler', StandardScaler()), ('regressor', RandomForestRegressor())]), "pipeline"),
+    }
 
-        # Initialize and train the model
-        model_diabetes = RandomForestRegressor()
-        model_diabetes.fit(X_train_diabetes, y_train_diabetes)
+    for model_name, (model, model_prefix) in models.items():
+        with st.form(f"{model_prefix}_model_form"):
+            test_size = st.slider(f"Test Size ({model_name})", 0.1, 0.5, 0.2, 0.05)
+            submit_button = st.form_submit_button(label=f"Train {model_name} Model")
 
-        # Make predictions
-        y_pred_diabetes = model_diabetes.predict(X_test_diabetes)
+        if submit_button:
+            # Split the data
+            X_train_model, X_test_model, y_train_model, y_test_model = train_test_split(
+                X_diabetes, y_diabetes, test_size=test_size, random_state=42
+            )
 
-        # Log model and metrics to MLflow
-        with mlflow.start_run():
-            mlflow.log_param("split_ratio_diabetes", split_ratio_diabetes)
-            mlflow.log_metric("mean_squared_error_diabetes", mean_squared_error(y_test_diabetes, y_pred_diabetes))
-            mlflow.sklearn.log_model(model_diabetes, "model_diabetes")
+            # Train the model
+            model.fit(X_train_model, y_train_model)
 
-        # Download artifacts
-        if mlflow.active_run() is not None:
-            run_id_model_diabetes = mlflow.active_run().info.run_id
-            with TempDir(chdr=True) as tmp_model_diabetes:
-                try:
-                    download_artifacts(run_id_model_diabetes, "model_diabetes", tmp_model_diabetes.path())
-                    st.success(f"Artifacts downloaded successfully to {tmp_model_diabetes.path()}")
-                except MlflowException as e:
-                    st.error(f"Failed to download artifacts: {e}")
+            # Make predictions
+            y_pred_model = model.predict(X_test_model)
+
+            # Calculate mean squared error
+            mse_model = mean_squared_error(y_test_model, y_pred_model)
+
+            # Log model and metrics to MLflow
+            with mlflow.start_run():
+                mlflow.log_param(f"test_size_{model_prefix}", test_size)
+                mlflow.log_metric(f"mean_squared_error_{model_prefix}", mse_model)
+                mlflow.sklearn.log_model(model, f"model_{model_prefix}")
+
+            # Download artifacts
+            if mlflow.active_run() is not None:
+                run_id_model = mlflow.active_run().info.run_id
+                with TempDir(chdr=True) as tmp_model:
+                    try:
+                        download_artifacts(run_id_model, f"model_{model_prefix}", tmp_model.path())
+                        st.success(f"Artifacts downloaded successfully to {tmp_model.path()}")
+                    except MlflowException as e:
+                        st.error(f"Failed to download artifacts: {e}")
