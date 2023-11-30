@@ -2,17 +2,31 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from sklearn.datasets import load_diabetes
-from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVR
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
 import mlflow
 import mlflow.sklearn
+from mlflow.artifacts import download_artifacts
+from mlflow.exceptions import MlflowException
+from mlflow.utils.file_utils import TempDir
 
 # Load Diabetes dataset
 diabetes = load_diabetes()
-X = diabetes.data
-y = diabetes.target
+X_diabetes = diabetes.data
+y_diabetes = diabetes.target
 
+# Set page layout
+st.set_page_config(
+    page_title="Diabetes MLOps Project",
+    page_icon=":pill:",
+    layout="wide",
+)
 
 # Add logo to the top right corner
 logo_path = "diabetes.jpg"
@@ -38,34 +52,24 @@ elif page == "Visualization":
     st.write("Explore visualizations of the Diabetes dataset.")
 
     # Create DataFrame
-    df = pd.DataFrame(data=diabetes.data, columns=diabetes.feature_names)
-    df['target'] = diabetes.target
+    df_diabetes = pd.DataFrame(data=X_diabetes, columns=[f'feature_{i}' for i in range(X_diabetes.shape[1])])
+    df_diabetes['target'] = y_diabetes
 
-    # Scatter plot
-    st.subheader("Scatter Plot:")
-    scatter_fig = px.scatter_matrix(df, dimensions=diabetes.feature_names, color='target')
-    st.plotly_chart(scatter_fig)
-
+    
     # Histogram
     st.subheader("Histogram:")
-    histogram_fig = px.histogram(df, x='target', color='target', marginal='rug')
+    histogram_fig = px.histogram(df_diabetes, x='target', color='target', marginal='rug')
     st.plotly_chart(histogram_fig)
 
-    # Heatmap
-    st.subheader("Heatmap:")
-    heatmap_fig = px.imshow(df.corr(), color_continuous_scale='viridis', labels=dict(color='Correlation'))
-    st.plotly_chart(heatmap_fig)
-
-    # Count plot
-    st.subheader("Count Plot:")
-    countplot_fig = px.histogram(df, x='target', color='target', marginal='rug')
-    st.plotly_chart(countplot_fig)
+    # Boxplot
+    st.subheader("Box Plot:")
+    boxplot_fig = px.box(df_diabetes, y='target', points='all', title='Target Boxplot')
+    st.plotly_chart(boxplot_fig)
 
     # Bar plot
     st.subheader("Bar Plot:")
-    barplot_fig = px.bar(df, x='target', title='Target distribution')
+    barplot_fig = px.bar(df_diabetes, x='target', title='Target distribution')
     st.plotly_chart(barplot_fig)
-
 
 # Modeling Page
 elif page == "Modeling":
@@ -77,23 +81,35 @@ elif page == "Modeling":
 
     # Model training
     st.subheader("Train Model:")
-    with st.form("train_model_form"):
-        split_ratio = st.slider("Train/Test Split Ratio", 0.1, 0.9, 0.8, 0.05)
-        submit_button = st.form_submit_button(label="Train Model")
+    with st.form("train_model_form_diabetes"):
+        split_ratio_diabetes = st.slider("Train/Test Split Ratio", 0.1, 0.9, 0.8, 0.05)
+        submit_button_diabetes = st.form_submit_button(label="Train Model")
 
-    if submit_button:
+    if submit_button_diabetes:
         # Split the data
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=split_ratio, random_state=42)
+        X_train_diabetes, X_test_diabetes, y_train_diabetes, y_test_diabetes = train_test_split(
+            X_diabetes, y_diabetes, test_size=split_ratio_diabetes, random_state=42
+        )
 
         # Initialize and train the model
-        model = RandomForestRegressor()
-        model.fit(X_train, y_train)
+        model_diabetes = RandomForestRegressor()
+        model_diabetes.fit(X_train_diabetes, y_train_diabetes)
 
         # Make predictions
-        y_pred = model.predict(X_test)
+        y_pred_diabetes = model_diabetes.predict(X_test_diabetes)
 
         # Log model and metrics to MLflow
         with mlflow.start_run():
-            mlflow.log_param("split_ratio", split_ratio)
-            mlflow.log_metric("mean_squared_error", mean_squared_error(y_test, y_pred))
-            mlflow.sklearn.log_model(model, "model")
+            mlflow.log_param("split_ratio_diabetes", split_ratio_diabetes)
+            mlflow.log_metric("mean_squared_error_diabetes", mean_squared_error(y_test_diabetes, y_pred_diabetes))
+            mlflow.sklearn.log_model(model_diabetes, "model_diabetes")
+
+        # Download artifacts
+        if mlflow.active_run() is not None:
+            run_id_model_diabetes = mlflow.active_run().info.run_id
+            with TempDir(chdr=True) as tmp_model_diabetes:
+                try:
+                    download_artifacts(run_id_model_diabetes, "model_diabetes", tmp_model_diabetes.path())
+                    st.success(f"Artifacts downloaded successfully to {tmp_model_diabetes.path()}")
+                except MlflowException as e:
+                    st.error(f"Failed to download artifacts: {e}")
