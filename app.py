@@ -122,3 +122,4 @@ elif page == "Modeling":
                         st.success(f"Artifacts downloaded successfully to {tmp_model.path()}")
                     except MlflowException as e:
                         st.error(f"Failed to download artifacts: {e}")
+
