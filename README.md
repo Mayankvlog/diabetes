@@ -1,4 +1,4 @@
-#    diabete_Mlops
+#    Diabete_Mlops
 
 This Streamlit application coordinates diabetes information examination with MLOps utilizing MLflow. It has three pages: **Home**, **Visualization**, and **Modeling**.
 
